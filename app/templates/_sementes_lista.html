@@ -1,0 +1,32 @@
+<ul class="sementes" id="lista-sementes">
+  {% for semente in usuario.sementes %}
+    <li>
+      <span><span class="ordem">{{ '%02d'|format(loop.index) }}</span>&nbsp;&nbsp;{{ semente.nome }}</span>
+      <button type="button" class="perigo"
+              hx-delete="/sementes/{{ semente.id }}"
+              hx-target="#lista-sementes"
+              hx-swap="outerHTML"
+              aria-label="remover {{ semente.nome }}">remover</button>
+    </li>
+  {% else %}
+    <li><span class="terciario">nenhuma semente ainda</span></li>
+  {% endfor %}
+</ul>
+
+<p class="legenda" style="margin-top:1rem">
+  {% set n = usuario.sementes|length %}
+  {% if n < minimo %}
+    faltam {{ minimo - n }} pra poder garimpar
+  {% elif n >= maximo %}
+    no limite de {{ maximo }}
+  {% else %}
+    {{ n }} de {{ maximo }} — dá pra garimpar
+  {% endif %}
+</p>
+
+{# limpa o autocomplete depois de adicionar #}
+<ul class="sugestoes" id="sugestoes" hx-swap-oob="true"></ul>
+<script>
+  var campoBusca = document.getElementById('busca');
+  if (campoBusca) campoBusca.value = '';
+</script>

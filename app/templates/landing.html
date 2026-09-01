@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>descubra quem quase ninguém conhece</h1>
+  </div>
+
+  <div class="bloco">
+    <p>
+      você diz de três a oito artistas que já escuta. o garimpo atravessa o
+      grafo de similaridade do last.fm procurando quem está fora do radar.
+    </p>
+    <p>
+      cada descoberta vem com o caminho que levou até ela — quem foi a ponte,
+      e o quanto cada salto se parecia com o anterior.
+    </p>
+    <p>
+      você aprova ou descarta, e as pontes que rendem passam a pesar mais nas
+      próximas rodadas.
+    </p>
+  </div>
+
+  <div class="bloco exemplo">
+    <p class="legenda">um caminho de verdade, de uma rodada de verdade:</p>
+    {{ m.rota({'passos': [
+      {'de': 'Codeine', 'para': 'Bluetile Lounge', 'match': 0.71},
+      {'de': 'Bluetile Lounge', 'para': 'C-Clamp', 'match': 0.52}
+    ]}) }}
+    <p class="medidas" style="margin-top:1rem">
+      <span><b>22.567</b> ouvintes</span>
+      <span>chegou por <b>4</b> caminhos diferentes</span>
+    </p>
+  </div>
+
+  <div class="bloco">
+    <a class="botao principal" href="/cadastro">criar conta</a>
+  </div>
+{% endblock %}

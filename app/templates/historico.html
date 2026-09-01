@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% set secao = 'historico' %}
+{% block titulo %}histórico · garimpo{% endblock %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>histórico</h1>
+    <p class="legenda">
+      {% if aprovadas %}
+        {{ aprovadas|length }}{{ ' artista aprovado' if aprovadas|length == 1 else ' artistas aprovados' }}, do mais recente pro mais antigo. o caminho de cada um continua aqui.
+      {% else %}
+        o que você aprovar no garimpo aparece aqui.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if not aprovadas %}
+    <div class="bloco vazio">
+      <p>nada aprovado ainda.</p>
+      <p><a href="/garimpo">ir garimpar</a></p>
+    </div>
+  {% endif %}
+
+  {% for descoberta in aprovadas %}
+    <article class="card">
+      <div class="card-topo">
+        <h2 class="card-nome">{{ descoberta.artista.nome }}</h2>
+        <span class="card-ouvintes">
+          {{ m.numero(descoberta.artista.listeners) }} ouvintes
+          <span class="terciario">· {{ descoberta.feedback.criado_em|data }}</span>
+        </span>
+      </div>
+
+      {{ m.rota(descoberta.rota[0]) }}
+
+      {% if descoberta.n_rotas > 1 %}
+        <details class="rota-extra">
+          <summary>chegou por mais {{ descoberta.n_rotas - 1 }}{{ ' caminho' if descoberta.n_rotas == 2 else ' caminhos' }}</summary>
+          {% for outra in descoberta.rota[1:] %}
+            {{ m.rota(outra, destaque=false) }}
+          {% endfor %}
+        </details>
+      {% endif %}
+
+      {% if descoberta.artista.tags %}
+        <ul class="tags">
+          {% for tag in descoberta.artista.tags[:6] %}
+            <li class="tag">{{ tag|lower }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if descoberta.ponte %}
+        <p class="medidas">
+          <span>ponte: <b>{{ descoberta.ponte.nome }}</b></span>
+          <span>semana <b>{{ descoberta.semana }}</b></span>
+        </p>
+      {% endif %}
+    </article>
+  {% endfor %}
+{% endblock %}

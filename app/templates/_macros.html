@@ -1,0 +1,17 @@
+{# Desenha uma rota: semente ──0.87──> ponte ──0.64──> descoberta
+
+   É o elemento mais importante da interface inteira. Nunca abreviar, nunca
+   esconder atrás de um clique: sem o caminho, o produto vira só mais uma
+   lista de recomendação. #}
+{% macro rota(r, destaque=true) %}
+<div class="rota">
+  <span class="rota-no semente">{{ r.passos[0].de }}</span>
+  {% for passo in r.passos %}
+    <span class="rota-seta" aria-label="similaridade {{ '%.2f'|format(passo.match) }}"
+      >──{{ '%.2f'|format(passo.match) }}──&gt;</span>
+    <span class="rota-no {% if loop.last and destaque %}alvo{% endif %}">{{ passo.para }}</span>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro numero(n) %}{{ '{:,}'.format(n or 0).replace(',', '.') }}{% endmacro %}

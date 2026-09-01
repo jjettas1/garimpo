@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}cadastro · garimpo{% endblock %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>criar conta</h1>
+    <p class="legenda">só email e senha. nada de login social.</p>
+  </div>
+
+  <div class="bloco">
+    {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+
+    <form method="post" action="/cadastro">
+      <div class="campo">
+        <label for="email">email</label>
+        <input id="email" name="email" type="email" value="{{ email or '' }}"
+               required autofocus autocomplete="email">
+      </div>
+      <div class="campo">
+        <label for="senha">senha <span class="terciario">— mínimo 8 caracteres</span></label>
+        <input id="senha" name="senha" type="password" minlength="8"
+               required autocomplete="new-password">
+      </div>
+      <div class="acoes">
+        <button class="principal" type="submit">enviar código</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bloco legenda">
+    já tem conta? <a href="/entrar">entrar</a>
+  </div>
+{% endblock %}

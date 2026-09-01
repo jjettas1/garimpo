@@ -1,0 +1,478 @@
+/* garimpo — folha de estilo única.
+ *
+ * Terminal escuro, sério. A regra que guia tudo aqui: sem gradiente, sem
+ * glow, sem sombra, sem animação decorativa. O que dá hierarquia é
+ * espaçamento, peso da fonte e os três níveis de verde — nada mais.
+ */
+
+/* ---------------------------------------------------------------- fonte */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/static/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/static/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/static/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------- cores */
+
+:root {
+  --fundo:       #080b09;
+  --superficie:  #0b0f0c;
+  --acao:        #00e05f;
+  --texto-2:     #4f8f69;
+  --texto-3:     #2f5c45;
+  --borda:       #1d3527;
+
+  /* Não estavam na spec, mas a interface não fecha sem elas.
+     O texto primário é um branco puxado pro verde, pra não brigar com a
+     paleta; o vermelho é dessaturado pelo mesmo motivo. */
+  --texto:       #dbe7de;
+  --perigo:      #c0503c;
+
+  --fonte: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --gap-1: .5rem;
+  --gap-2: 1rem;
+  --gap-3: 1.75rem;
+  --gap-4: 3rem;
+  --gap-5: 5rem;
+
+  --largura: 46rem;
+  --raio: 3px;
+}
+
+/* ---------------------------------------------------------------- base */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 15px;
+  line-height: 1.65;
+  font-variant-ligatures: none;   /* código é bonito com ligadura, interface não */
+}
+
+a {
+  color: var(--acao);
+  text-decoration: none;
+  border-bottom: 1px solid var(--borda);
+}
+a:hover { border-bottom-color: var(--acao); }
+
+:focus-visible {
+  outline: 2px solid var(--acao);
+  outline-offset: 2px;
+}
+
+h1, h2, h3 {
+  font-weight: 500;
+  line-height: 1.3;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+h1 { font-size: 1.45rem; }
+h2 { font-size: 1.1rem; }
+h3 { font-size: 1rem; }
+
+p { margin: 0 0 var(--gap-2); }
+p:last-child { margin-bottom: 0; }
+
+code { font-family: inherit; }
+
+::selection { background: var(--acao); color: var(--fundo); }
+
+/* ---------------------------------------------------------------- esqueleto */
+
+.pagina {
+  max-width: var(--largura);
+  margin: 0 auto;
+  padding: var(--gap-3) var(--gap-2) var(--gap-5);
+}
+
+.topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--gap-2);
+  border-bottom: 1px solid var(--borda);
+  margin-bottom: var(--gap-4);
+}
+
+.marca {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--texto);
+  border: 0;
+  letter-spacing: .02em;
+}
+.marca::before { content: "> "; color: var(--acao); }
+
+.menu {
+  display: flex;
+  gap: var(--gap-2);
+  align-items: baseline;
+  font-size: .82rem;
+  color: var(--texto-3);
+}
+.menu a { border: 0; color: var(--texto-2); }
+.menu a:hover, .menu a[aria-current="page"] { color: var(--acao); }
+
+.bloco + .bloco { margin-top: var(--gap-4); }
+
+.legenda {
+  color: var(--texto-2);
+  font-size: .82rem;
+  margin-bottom: var(--gap-2);
+}
+.terciario { color: var(--texto-3); }
+
+/* ---------------------------------------------------------------- rota */
+
+/* O caminho semente -> ponte -> descoberta. É o produto: ganha o maior
+   destaque do card e nunca é abreviado. */
+
+.rota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-1);
+  font-size: .92rem;
+  line-height: 2.1;
+}
+.rota-no { color: var(--texto); }
+.rota-no.semente { color: var(--texto-2); }
+.rota-no.alvo { color: var(--acao); font-weight: 500; }
+
+.rota-seta {
+  color: var(--texto-3);
+  font-size: .74rem;
+  white-space: nowrap;
+  letter-spacing: .04em;
+}
+
+.rota-extra {
+  margin-top: var(--gap-2);
+  padding-top: var(--gap-2);
+  border-top: 1px solid var(--borda);
+}
+.rota-extra summary {
+  cursor: pointer;
+  color: var(--texto-2);
+  font-size: .82rem;
+  list-style: none;
+}
+.rota-extra summary::-webkit-details-marker { display: none; }
+.rota-extra summary::before { content: "+ "; color: var(--texto-3); }
+.rota-extra[open] summary::before { content: "− "; }
+.rota-extra .rota { margin-top: var(--gap-2); font-size: .84rem; }
+
+/* ---------------------------------------------------------------- cards */
+
+.card {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: var(--gap-3);
+}
+.card + .card { margin-top: var(--gap-2); }
+
+.card-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--gap-2);
+}
+.card-nome { font-size: 1.25rem; font-weight: 500; color: var(--texto); }
+.card-ouvintes { color: var(--texto-2); font-size: .82rem; white-space: nowrap; }
+
+.medidas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-2);
+  margin-top: var(--gap-2);
+  font-size: .76rem;
+  color: var(--texto-3);
+}
+.medidas b { font-weight: 400; color: var(--texto-2); }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-1);
+  margin-top: var(--gap-2);
+  list-style: none;
+  padding: 0;
+}
+.tag {
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: .1rem .45rem;
+  font-size: .74rem;
+  color: var(--texto-2);
+}
+
+/* ---------------------------------------------------------------- formulário */
+
+label {
+  display: block;
+  font-size: .82rem;
+  color: var(--texto-2);
+  margin-bottom: var(--gap-1);
+}
+
+input[type="text"], input[type="email"], input[type="password"], input[type="number"] {
+  width: 100%;
+  padding: .6rem .7rem;
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  font: inherit;
+}
+input:focus { border-color: var(--acao); }
+input::placeholder { color: var(--texto-3); }
+
+.campo + .campo { margin-top: var(--gap-2); }
+
+.linha {
+  display: flex;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.linha > * { flex: 1 1 8rem; }
+
+button, .botao {
+  font: inherit;
+  padding: .55rem 1.1rem;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  background: transparent;
+  color: var(--texto-2);
+  cursor: pointer;
+}
+button:hover, .botao:hover { color: var(--acao); border-color: var(--acao); }
+button:disabled { opacity: .4; cursor: default; }
+button:disabled:hover { color: var(--texto-2); border-color: var(--borda); }
+
+.principal {
+  background: var(--acao);
+  border-color: var(--acao);
+  color: var(--fundo);
+  font-weight: 500;
+}
+.principal:hover { background: var(--texto); border-color: var(--texto); color: var(--fundo); }
+
+.perigo:hover { color: var(--perigo); border-color: var(--perigo); }
+
+.acoes {
+  display: flex;
+  gap: var(--gap-1);
+  flex-wrap: wrap;
+  margin-top: var(--gap-3);
+  padding-top: var(--gap-3);
+  border-top: 1px solid var(--borda);
+}
+
+/* ---------------------------------------------------------------- avisos */
+
+.erro, .aviso {
+  padding: .6rem .8rem;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  font-size: .85rem;
+  margin-bottom: var(--gap-2);
+}
+.erro { color: var(--perigo); border-color: var(--perigo); }
+.aviso { color: var(--texto-2); }
+
+/* ---------------------------------------------------------------- código de 6 dígitos */
+
+.digitos {
+  display: flex;
+  gap: var(--gap-1);
+  margin-bottom: var(--gap-2);
+}
+.digitos input {
+  width: 2.9rem;
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 1.3rem;
+  padding: .55rem 0;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------- sementes */
+
+.sementes { list-style: none; padding: 0; margin: 0; }
+.sementes li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  padding: .55rem 0;
+  border-bottom: 1px solid var(--borda);
+}
+.sementes li:first-child { border-top: 1px solid var(--borda); }
+.sementes .ordem { color: var(--texto-3); font-size: .8rem; }
+.sementes button { padding: .15rem .5rem; font-size: .78rem; }
+
+.sugestoes { list-style: none; padding: 0; margin: var(--gap-1) 0 0; }
+.sugestoes li { border-bottom: 1px solid var(--borda); }
+.sugestoes li:first-child { border-top: 1px solid var(--borda); }
+.sugestoes button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  padding: .5rem .1rem;
+  color: var(--texto);
+}
+.sugestoes button:hover { color: var(--acao); }
+
+/* ---------------------------------------------------------------- estado da rodada */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-1);
+  color: var(--texto-2);
+  font-size: .85rem;
+}
+/* O único movimento da interface inteira, e não é decoração: é o sinal de
+   que a rodada ainda está viva. Sem ele a tela parece travada. */
+.status::before {
+  content: "";
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: var(--acao);
+  animation: pulsar 1.4s ease-in-out infinite;
+}
+@keyframes pulsar { 50% { opacity: .15; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .status::before { animation: none; }
+}
+
+.contador {
+  color: var(--texto-3);
+  font-size: .8rem;
+  margin-bottom: var(--gap-2);
+}
+
+.vazio {
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+  padding: var(--gap-3);
+  color: var(--texto-2);
+  font-size: .88rem;
+}
+
+/* ---------------------------------------------------------------- exemplo da landing */
+
+.exemplo {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-left: 2px solid var(--acao);
+  border-radius: var(--raio);
+  padding: var(--gap-3);
+}
+
+.rodape {
+  margin-top: var(--gap-5);
+  padding-top: var(--gap-2);
+  border-top: 1px solid var(--borda);
+  color: var(--texto-3);
+  font-size: .76rem;
+}
+
+@media (max-width: 30rem) {
+  .pagina { padding-top: var(--gap-2); }
+  .digitos input { width: 2.4rem; font-size: 1.1rem; }
+}
+
+/* ---------------------------------------------------------------- retrospectiva */
+
+.semana-titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--gap-3);
+}
+.semana-data { color: var(--texto-3); font-size: .78rem; }
+
+.numeros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-4);
+}
+.numero-valor {
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--acao);
+  line-height: 1.2;
+}
+.numero-valor.apagado { color: var(--texto-3); }
+.numero-rotulo { color: var(--texto-2); font-size: .76rem; }
+
+.ranking { list-style: none; padding: 0; margin: 0; }
+.ranking li {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  padding: .4rem 0;
+  border-bottom: 1px solid var(--borda);
+  font-size: .88rem;
+}
+.ranking li:first-child { border-top: 1px solid var(--borda); }
+.ranking .nome { flex: 1 1 10rem; }
+.ranking .conta { color: var(--texto-2); font-size: .8rem; white-space: nowrap; }
+
+/* Barra de peso da ponte. Não é enfeite: é o dado. O traço em 50% marca o
+   peso neutro (1.0), pra dar pra ver de relance quem subiu e quem desceu. */
+.peso-trilho {
+  position: relative;
+  flex: 0 0 8rem;
+  height: .55rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+}
+.peso-trilho::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--texto-3);
+}
+/* display:block é obrigatório: em <span> inline o width/height é ignorado
+   e a barra some, deixando só o trilho vazio. */
+.peso-barra { display: block; height: 100%; background: var(--texto-3); }
+.peso-barra.rende { background: var(--acao); }
+.peso-valor { flex: 0 0 3rem; text-align: right; font-size: .8rem; color: var(--texto-2); }

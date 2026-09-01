@@ -1,0 +1,16 @@
+<ul class="sugestoes" id="sugestoes">
+  {% for achado in achados %}
+    <li>
+      {# um formulário por sugestão: o nome do artista vai escapado pelo
+         jinja, sem precisar montar json na mão #}
+      <form hx-post="/sementes/adicionar" hx-target="#lista-sementes" hx-swap="outerHTML">
+        <input type="hidden" name="nome" value="{{ achado.nome }}">
+        <button type="submit">{{ achado.nome }}</button>
+      </form>
+    </li>
+  {% else %}
+    {% if termo|length >= 2 %}
+      <li><span class="terciario" style="display:block;padding:.5rem .1rem">nada encontrado</span></li>
+    {% endif %}
+  {% endfor %}
+</ul>

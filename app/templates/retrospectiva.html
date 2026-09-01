@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% set secao = 'retrospectiva' %}
+{% block titulo %}retrospectiva · garimpo{% endblock %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>retrospectiva</h1>
+    <p class="legenda">
+      o que cada semana rendeu, e quanto cada ponte pesa na próxima rodada.
+    </p>
+  </div>
+
+  {% if not semanas %}
+    <div class="bloco vazio">
+      <p>nenhuma rodada ainda.</p>
+      <p><a href="/garimpo">ir garimpar</a></p>
+    </div>
+  {% endif %}
+
+  {% for s in semanas %}
+    <article class="card">
+      <div class="semana-titulo">
+        <h2>{{ s.semana }}</h2>
+        {% if s.intervalo %}
+          <span class="semana-data">
+            {{ s.intervalo[0].strftime('%d/%m') }} a {{ s.intervalo[1].strftime('%d/%m/%Y') }}
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="numeros">
+        <div>
+          <div class="numero-valor">{{ s.aprovados }}</div>
+          <div class="numero-rotulo">aprovados</div>
+        </div>
+        <div>
+          {% if s.taxa is none %}
+            <div class="numero-valor apagado">—</div>
+            <div class="numero-rotulo">nada julgado ainda</div>
+          {% else %}
+            <div class="numero-valor">{{ (s.taxa * 100)|round|int }}%</div>
+            <div class="numero-rotulo">de {{ s.com_veredito }} julgados</div>
+          {% endif %}
+        </div>
+        <div>
+          {% if s.media_ouvintes %}
+            <div class="numero-valor">{{ '{:,}'.format(s.media_ouvintes).replace(',', '.') }}</div>
+            <div class="numero-rotulo">ouvintes em média</div>
+          {% else %}
+            <div class="numero-valor apagado">—</div>
+            <div class="numero-rotulo">ouvintes em média</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="numero-valor apagado">{{ s.descobertas }}</div>
+          <div class="numero-rotulo">descobertas na semana</div>
+        </div>
+      </div>
+
+      {% if s.pontes %}
+        <p class="legenda" style="margin-top:1.75rem">pontes que mais renderam</p>
+        <ul class="ranking">
+          {% for p in s.pontes %}
+            <li>
+              <span class="nome">{{ p.nome }}</span>
+              <span class="conta">{{ p.aprovados }} de {{ p.total }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </article>
+  {% endfor %}
+
+  {% if pesos %}
+    <div class="bloco">
+      <h2>peso das pontes agora</h2>
+      <p class="legenda">
+        é isto que muda a próxima rodada: acima do traço a ponte pesa mais que
+        o neutro, abaixo pesa menos. ponte sem histórico entra em 1.00.
+      </p>
+      <ul class="ranking">
+        {% for p in pesos %}
+          <li>
+            <span class="nome">{{ p.nome }}</span>
+            <span class="conta">{{ p.aprovados }}/{{ p.total }}</span>
+            <span class="peso-trilho">
+              <span class="peso-barra {% if p.rende %}rende{% endif %}"
+                    style="width: {{ (p.peso / 2 * 100)|round(1) }}%"></span>
+            </span>
+            <span class="peso-valor">{{ '%.2f'|format(p.peso) }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endblock %}

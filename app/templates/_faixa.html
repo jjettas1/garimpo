@@ -1,0 +1,24 @@
+<form id="faixa" hx-post="/sementes/faixa" hx-target="#faixa" hx-swap="outerHTML">
+  <p class="legenda">
+    faixa de ouvintes — quem estiver fora dela nem entra no ranking
+  </p>
+
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  {% if aviso %}<p class="aviso">{{ aviso }}</p>{% endif %}
+
+  <div class="linha">
+    <div class="campo">
+      <label for="piso">piso</label>
+      <input id="piso" name="piso" type="number" min="0" step="100"
+             value="{{ usuario.piso_ouvintes }}" required>
+    </div>
+    <div class="campo">
+      <label for="teto">teto</label>
+      <input id="teto" name="teto" type="number" min="1" step="1000"
+             value="{{ usuario.teto_ouvintes }}" required>
+    </div>
+    <div class="campo" style="flex:0 0 auto">
+      <button type="submit">salvar faixa</button>
+    </div>
+  </div>
+</form>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}garimpo{% endblock %}</title>
+  <link rel="stylesheet" href="/static/estilo.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <div class="pagina">
+    <header class="topo">
+      <a class="marca" href="/">garimpo</a>
+      <nav class="menu">
+        {% if usuario %}
+          <a href="/sementes" {% if secao == 'sementes' %}aria-current="page"{% endif %}>sementes</a>
+          <a href="/garimpo" {% if secao == 'garimpo' %}aria-current="page"{% endif %}>garimpo</a>
+          <a href="/historico" {% if secao == 'historico' %}aria-current="page"{% endif %}>histórico</a>
+          <a href="/retrospectiva" {% if secao == 'retrospectiva' %}aria-current="page"{% endif %}>retrospectiva</a>
+          <form method="post" action="/sair">
+            <button type="submit">sair</button>
+          </form>
+        {% else %}
+          <a href="/entrar">entrar</a>
+          <a href="/cadastro">criar conta</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <main>
+      {% block conteudo %}{% endblock %}
+    </main>
+
+    <footer class="rodape">
+      {% block rodape %}last.fm é a fonte dos dados. o caminho é nosso.{% endblock %}
+    </footer>
+  </div>
+</body>
+</html>

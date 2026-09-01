@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% set secao = 'garimpo' %}
+{% block titulo %}garimpo · garimpo{% endblock %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>garimpo</h1>
+    <p class="legenda">uma descoberta por vez, com o caminho que levou até ela.</p>
+  </div>
+
+  {# O miolo é servido à parte: é ele que o polling troca enquanto a rodada
+     roda, e é ele que cada botão de veredito devolve. #}
+  <div class="bloco" id="palco" hx-get="/garimpo/estado" hx-trigger="load" hx-swap="innerHTML">
+    <p class="status">carregando…</p>
+  </div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set secao = 'sementes' %}
+{% block titulo %}sementes · garimpo{% endblock %}
+
+{% block conteudo %}
+  <div class="bloco">
+    <h1>sementes</h1>
+    <p class="legenda">
+      de {{ minimo }} a {{ maximo }} artistas que você já escuta. é daqui que
+      todo caminho parte — nada mais sobre você é usado.
+    </p>
+  </div>
+
+  <div class="bloco">
+    {% include "_sementes_lista.html" %}
+  </div>
+
+  <div class="bloco">
+    <label for="busca">adicionar artista</label>
+    <input id="busca" name="termo" type="text" autocomplete="off"
+           placeholder="comece a digitar…"
+           hx-get="/sementes/buscar"
+           hx-trigger="keyup changed delay:400ms"
+           hx-target="#sugestoes"
+           hx-swap="outerHTML">
+    <ul class="sugestoes" id="sugestoes"></ul>
+  </div>
+
+  <div class="bloco">
+    {% include "_faixa.html" %}
+  </div>
+
+  <div class="bloco">
+    <a class="botao principal" href="/garimpo">ir garimpar</a>
+  </div>
+{% endblock %}

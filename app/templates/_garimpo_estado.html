@@ -1,0 +1,96 @@
+{% import "_macros.html" as m %}
+
+{% if usuario.sementes|length < minimo %}
+
+  <div class="vazio">
+    <p>o garimpo precisa de pelo menos {{ minimo }} sementes pra ter de onde partir.</p>
+    <p><a href="/sementes">cadastrar sementes</a></p>
+  </div>
+
+{% elif rodando %}
+
+  {# Enquanto a rodada não termina, esta div se recarrega sozinha. Quando o
+     estado mudar, a resposta não terá mais o hx-trigger e o polling para. #}
+  <div hx-get="/garimpo/estado" hx-trigger="every 2s" hx-target="#palco" hx-swap="innerHTML">
+    <p class="status">garimpando…</p>
+    <p class="legenda">
+      são centenas de consultas ao last.fm, seguradas em 4 por segundo.
+      a primeira rodada leva cerca de um minuto; as seguintes usam o cache e
+      são bem mais rápidas. pode deixar a aba aberta.
+    </p>
+  </div>
+
+{% elif pendentes %}
+
+  {% set descoberta = pendentes[0] %}
+  <p class="contador">descoberta 1 de {{ total }}</p>
+
+  <article class="card">
+    <div class="card-topo">
+      <h2 class="card-nome">{{ descoberta.artista.nome }}</h2>
+      <span class="card-ouvintes">{{ m.numero(descoberta.artista.listeners) }} ouvintes</span>
+    </div>
+
+    {{ m.rota(descoberta.rota[0]) }}
+
+    {% if descoberta.n_rotas > 1 %}
+      <details class="rota-extra">
+        <summary>chegou por mais {{ descoberta.n_rotas - 1 }}{{ ' caminho' if descoberta.n_rotas == 2 else ' caminhos' }}</summary>
+        {% for outra in descoberta.rota[1:] %}
+          {{ m.rota(outra, destaque=false) }}
+        {% endfor %}
+      </details>
+    {% endif %}
+
+    {% if descoberta.artista.tags %}
+      <ul class="tags">
+        {% for tag in descoberta.artista.tags[:6] %}
+          <li class="tag">{{ tag|lower }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <div class="medidas">
+      <span>score <b>{{ '%.3f'|format(descoberta.score) }}</b></span>
+      <span>afinidade <b>{{ '%.2f'|format(descoberta.afinidade) }}</b></span>
+      <span>raridade <b>{{ '%.2f'|format(descoberta.raridade) }}</b></span>
+      <span>coerência <b>{{ '%.2f'|format(descoberta.coerencia) }}</b></span>
+    </div>
+
+    {# Os três vereditos. hx-post troca só o palco: a página não recarrega. #}
+    <div class="acoes">
+      <button class="principal"
+              hx-post="/garimpo/{{ descoberta.id }}/aprovado"
+              hx-target="#palco" hx-swap="innerHTML">aprovar</button>
+      <button hx-post="/garimpo/{{ descoberta.id }}/pulado"
+              hx-target="#palco" hx-swap="innerHTML">pular</button>
+      <button class="perigo"
+              hx-post="/garimpo/{{ descoberta.id }}/banido"
+              hx-target="#palco" hx-swap="innerHTML">nunca mais</button>
+    </div>
+  </article>
+
+{% elif erro_da_rodada %}
+
+  <div class="vazio">
+    <p class="erro">a última rodada falhou.</p>
+    <p class="terciario">{{ erro_da_rodada }}</p>
+    <form hx-post="/garimpo" hx-target="#palco" hx-swap="innerHTML">
+      <button class="principal" type="submit">tentar de novo</button>
+    </form>
+  </div>
+
+{% else %}
+
+  <div class="vazio">
+    <p>nada na fila.</p>
+    <p class="terciario">
+      cada rodada percorre o grafo a partir das suas sementes e traz o que
+      ainda não passou por aqui.
+    </p>
+    <form hx-post="/garimpo" hx-target="#palco" hx-swap="innerHTML">
+      <button class="principal" type="submit">garimpar</button>
+    </form>
+  </div>
+
+{% endif %}
