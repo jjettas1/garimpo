@@ -7,7 +7,7 @@ de ponta a ponta.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections.abc import Callable
 from typing import Annotated
@@ -356,12 +356,34 @@ def tela_retrospectiva(request: Request, sessao: BD, usuario: LOGADO):
 # ---------------------------------------------------------------- garimpo
 
 
+LIMITE_DA_RODADA = timedelta(minutes=15)
+"""Depois disso, uma rodada ainda `rodando` está morta.
+
+A tarefa de fundo vive no processo. Se o processo cair no meio — deploy,
+reinício, ou o serviço dormindo por inatividade no plano gratuito — ninguém
+marca a linha em `runs`, e a tela fica em "garimpando…" pra sempre.
+
+15 minutos dá folga larga: a rodada mais lenta medida foi 72s.
+"""
+
+
 def _rodada_em_andamento(sessao: Session, usuario: User) -> Run | None:
-    return sessao.scalar(
+    rodada = sessao.scalar(
         select(Run)
         .where(Run.user_id == usuario.id, Run.status == StatusRun.RODANDO)
         .order_by(Run.iniciado_em.desc())
     )
+    if rodada is None:
+        return None
+
+    if agora() - rodada.iniciado_em > LIMITE_DA_RODADA:
+        rodada.status = StatusRun.ERRO
+        rodada.erro = "a rodada foi interrompida — o servidor deve ter reiniciado"
+        rodada.terminado_em = agora()
+        sessao.flush()
+        return None
+
+    return rodada
 
 
 def _ultima_rodada(sessao: Session, usuario: User) -> Run | None:

@@ -158,12 +158,40 @@ Em serverless o banco sumiria a cada requisição, o garimpo seria morto antes
 de terminar, e cada instância teria seu próprio orçamento de requisições —
 estourando o teto do Last.fm.
 
-### O aviso do disco
+### Os dois bancos
 
-O bloco `disk` do `render.yaml` é o que faz o SQLite sobreviver a reinício e
-a deploy. **Disco persistente não existe no plano gratuito do Render**: lá o
-sistema de arquivos é apagado a cada deploy, e com ele todas as contas e
-descobertas. Ou plano pago, ou trocar o SQLite por um Postgres externo.
+O app fala SQLite e Postgres, e a escolha é só a `DATABASE_URL`:
+
+| onde | banco | por quê |
+|---|---|---|
+| sua máquina | `sqlite:///garimpo.db` | zero configuração |
+| Render pago | `sqlite:////var/data/garimpo.db` | disco persistente, um arquivo só |
+| Render grátis | `postgresql://...` (Neon, Supabase) | sem disco, o SQLite seria apagado a cada deploy |
+
+O `render.yaml` vem configurado pro caminho gratuito. As diferenças de
+dialeto ficam todas no `app/db.py`:
+
+- URL de provedor vira URL que o SQLAlchemy aceita — `postgres://` e
+  `postgresql://` viram `postgresql+psycopg://`
+- Postgres gerenciado derruba conexão ociosa, então liga `pool_pre_ping`
+- SQLite ganha WAL, timeout e o pragma de chave estrangeira; o Postgres não
+  leva nada disso
+
+Pra conferir contra um Postgres de verdade antes de subir:
+
+```bash
+TEST_DATABASE_URL='postgresql://...' pytest tests/test_migracoes.py
+```
+
+Esse teste **apaga e recria o schema**, então aponte pra um banco
+descartável. Sem a variável ele é pulado.
+
+### Sobre o plano gratuito
+
+O serviço dorme por inatividade e demora a acordar. Uma rodada de garimpo
+deixada sozinha pode ser interrompida no meio — o app detecta rodada
+abandonada e oferece tentar de novo, em vez de ficar preso em
+"garimpando…".
 
 ## Testes
 

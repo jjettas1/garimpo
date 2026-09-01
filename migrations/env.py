@@ -54,7 +54,11 @@ def run_migrations_online() -> None:
 
     with engine.connect() as conexao:
         context.configure(
-            connection=conexao, target_metadata=target_metadata, render_as_batch=True
+            connection=conexao,
+            target_metadata=target_metadata,
+            # batch só faz sentido no SQLite: é a gambiarra de recriar a
+            # tabela pra simular ALTER COLUMN. O Postgres altera de verdade.
+            render_as_batch=engine.dialect.name == "sqlite",
         )
         with context.begin_transaction():
             context.run_migrations()

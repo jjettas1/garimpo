@@ -14,7 +14,9 @@ resumo operacional.
 - Alembic pra migrations
 - Sem Docker, sem Celery/RQ, sem Redis
 - Deploy no Render (`render.yaml`). **Não** serverless: o app precisa de
-  disco persistente, processo de pé e memória entre requisições
+  processo de pé e memória entre requisições
+- O banco pode ser SQLite ou Postgres — só muda a `DATABASE_URL`. As
+  diferenças de dialeto ficam isoladas no `app/db.py`
 - Last.fm é a **única** fonte externa de dados musicais. Nada de Spotify
 
 ## Estrutura

@@ -356,3 +356,38 @@ def test_data_do_aprovado_sai_no_fuso_de_quem_olha(logado, sessao, cadastrado, f
 
 def test_menu_leva_ao_historico(logado):
     assert 'href="/historico"' in logado.get("/garimpo").text
+
+
+def test_rodada_abandonada_nao_trava_a_tela(com_sementes, sessao, cliente, monkeypatch):
+    """A tarefa de fundo vive no processo. Se ele cair no meio — deploy,
+    reinício, ou o serviço dormindo no plano gratuito — ninguém marca a linha
+    em `runs`, e a tela ficaria em "garimpando…" pra sempre."""
+    from datetime import timedelta
+
+    from app.models import agora
+    from app.web import LIMITE_DA_RODADA
+
+    # uma rodada que começou e nunca terminou
+    rodada = Run(user_id=com_sementes.usuario_id, status=StatusRun.RODANDO)
+    sessao.add(rodada)
+    sessao.flush()
+    rodada.iniciado_em = agora() - LIMITE_DA_RODADA - timedelta(minutes=1)
+    sessao.flush()
+
+    corpo = com_sementes.get("/garimpo/estado").text
+
+    assert sessao.get(Run, rodada.id).status == StatusRun.ERRO
+    assert 'hx-trigger="every 2s"' not in corpo  # o polling parou
+    assert "tentar de novo" in corpo
+
+
+def test_rodada_recente_continua_valendo(com_sementes, sessao):
+    """O limite não pode matar uma rodada que ainda está trabalhando."""
+    rodada = Run(user_id=com_sementes.usuario_id, status=StatusRun.RODANDO)
+    sessao.add(rodada)
+    sessao.flush()
+
+    corpo = com_sementes.get("/garimpo/estado").text
+
+    assert sessao.get(Run, rodada.id).status == StatusRun.RODANDO
+    assert 'hx-trigger="every 2s"' in corpo

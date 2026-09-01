@@ -1,33 +1,62 @@
-"""Conexão com o banco e sessão do SQLAlchemy."""
+"""Conexão com o banco e sessão do SQLAlchemy.
+
+Fala os dois dialetos: SQLite (desenvolvimento, e produção com disco) e
+Postgres (produção sem disco, como no plano gratuito do Render). Cada um
+precisa de ajustes bem diferentes, e é isso que este arquivo resolve.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import obter_config
 
 
-def criar_engine(url: str | None = None) -> Engine:
-    """Engine do SQLAlchemy, com o SQLite ajustado pra dois escritores.
+def normalizar_url(url: str) -> str:
+    """Aceita as várias formas que os provedores entregam.
 
-    O garimpo roda numa tarefa de fundo enquanto a tela faz polling. Sem os
-    ajustes abaixo isso dá `database is locked` na primeira rodada:
+    - Render e Heroku dão `postgres://`, que o SQLAlchemy 2.x **recusa**
+    - Neon e Supabase dão `postgresql://`, que procura o psycopg2 — e o
+      projeto usa o psycopg 3
 
-    - **WAL**: separa o log de escrita do arquivo principal, então quem lê
-      não trava quem escreve. Sem isso o polling e o garimpo brigam.
-    - **timeout**: em vez de falhar na hora, um escritor espera até 30s pela
-      vez dele.
-    - **foreign_keys**: o SQLite ignora chave estrangeira em silêncio se
-      ninguém ligar o pragma à mão.
+    As duas viram `postgresql+psycopg://`. Uma URL que já traz driver
+    explícito passa intacta.
     """
-    url = url or obter_config().database_url
-    em_arquivo = url.startswith("sqlite") and ":memory:" not in url and url != "sqlite://"
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url.removeprefix("postgres://")
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    return url
 
+
+def e_sqlite_em_arquivo(url: str) -> bool:
+    """SQLite gravando em disco — nem memória, nem outro banco."""
+    return url.startswith("sqlite") and ":memory:" not in url and url != "sqlite://"
+
+
+def criar_engine(url: str | None = None) -> Engine:
+    url = normalizar_url(url or obter_config().database_url)
+
+    if not url.startswith("sqlite"):
+        # Postgres gerenciado (Neon, Supabase, Render) derruba conexão ociosa
+        # sem avisar. Sem `pool_pre_ping` a primeira requisição depois de um
+        # tempo parado morre com "server closed the connection".
+        return create_engine(
+            url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+            pool_recycle=300,
+            pool_size=5,
+            max_overflow=2,
+        )
+
+    em_arquivo = e_sqlite_em_arquivo(url)
     engine = create_engine(
         url,
         echo=False,
@@ -35,17 +64,22 @@ def criar_engine(url: str | None = None) -> Engine:
         connect_args={"timeout": 30} if em_arquivo else {},
     )
 
-    if url.startswith("sqlite"):
-        from sqlalchemy import event
+    @event.listens_for(engine, "connect")
+    def _ajustar_sqlite(conexao, _):  # noqa: ANN001
+        """Três pragmas que o SQLite não liga sozinho.
 
-        @event.listens_for(engine, "connect")
-        def _ajustar_sqlite(conexao, _):  # noqa: ANN001
-            cursor = conexao.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            if em_arquivo:
-                cursor.execute("PRAGMA journal_mode=WAL")
-                cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.close()
+        - **foreign_keys**: sem isso ele ignora chave estrangeira em silêncio
+        - **WAL**: separa o log de escrita, pra quem lê não travar quem
+          escreve. O garimpo escreve em segundo plano enquanto a tela faz
+          polling; sem WAL isso dá `database is locked`
+        - **timeout** (acima): em vez de falhar na hora, o escritor espera
+        """
+        cursor = conexao.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        if em_arquivo:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
 
     return engine
 

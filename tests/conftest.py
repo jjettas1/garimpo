@@ -185,6 +185,7 @@ def com_sementes(logado, sessao, cadastrado):
         sessao.add(SeedArtist(user_id=cadastrado.id, nome=nome, ordem=ordem))
     sessao.flush()
     sessao.refresh(cadastrado)
+    logado.usuario_id = cadastrado.id   # os testes precisam do id à mão
     return logado
 
 
