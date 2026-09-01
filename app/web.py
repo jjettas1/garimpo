@@ -92,16 +92,6 @@ def usuario_atual(
     return auth.usuario_por_token(sessao, garimpo_sessao)
 
 
-def ip_do_request(request: Request) -> str:
-    """Só serve pro rate limit.
-
-    Atrás de proxy isso vira o IP do proxy e o limite por IP perde o efeito;
-    quando entrar um proxy na frente, ler o X-Forwarded-For (e só confiar
-    nele se o proxy for seu).
-    """
-    return request.client.host if request.client else "desconhecido"
-
-
 def pegar_fabrica() -> sessionmaker[Session]:
     """A tarefa de fundo precisa da própria sessão: a do request já foi
     fechada quando ela roda."""

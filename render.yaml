@@ -1,0 +1,45 @@
+# Deploy no Render. Um processo de verdade, que fica de pé — é o que este
+# app precisa: o garimpo leva ~70s numa tarefa de fundo, e o banco é um
+# arquivo em disco.
+#
+# ATENÇÃO AO PLANO: o bloco `disk` abaixo é o que faz o SQLite sobreviver a
+# reinício e a deploy. Disco persistente não existe no plano gratuito do
+# Render — lá o sistema de arquivos é apagado a cada deploy, e com ele todas
+# as contas e descobertas. Ou usa plano pago, ou troca o SQLite por um
+# Postgres externo.
+
+services:
+  - type: web
+    name: garimpo
+    runtime: python
+    plan: starter          # `free` não aceita disco; veja o aviso acima
+    region: oregon
+
+    # o pyproject é a fonte da verdade das dependências
+    buildCommand: pip install -e .
+
+    # migrations antes de subir: o disco só existe em tempo de execução,
+    # então não dá pra rodar isso no build
+    startCommand: alembic upgrade head && uvicorn app.web:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /
+
+    disk:
+      name: dados
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+
+      - key: AMBIENTE
+        value: prod          # liga o Secure no cookie de sessão (o Render dá HTTPS)
+
+      # quatro barras: três do esquema + uma do caminho absoluto
+      - key: DATABASE_URL
+        value: sqlite:////var/data/garimpo.db
+
+      # preenchida à mão no painel do Render. nunca no repositório.
+      - key: LASTFM_API_KEY
+        sync: false

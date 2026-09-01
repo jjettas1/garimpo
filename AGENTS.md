@@ -13,6 +13,8 @@ resumo operacional.
 - Jinja2 no servidor + HTMX. Sem React, sem SPA, sem build de frontend
 - Alembic pra migrations
 - Sem Docker, sem Celery/RQ, sem Redis
+- Deploy no Render (`render.yaml`). **Não** serverless: o app precisa de
+  disco persistente, processo de pé e memória entre requisições
 - Last.fm é a **única** fonte externa de dados musicais. Nada de Spotify
 
 ## Estrutura

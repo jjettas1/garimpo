@@ -137,6 +137,34 @@ instantânea e o cronômetro entregaria quem tem conta aqui.
 verificação por email. O login, que é onde alguém tentaria entrar, continua
 sem vazar nada.
 
+## Deploy
+
+O `render.yaml` na raiz descreve o serviço. No painel do Render: **New →
+Blueprint**, aponte pro repositório, e preencha `LASTFM_API_KEY` (é a única
+variável marcada `sync: false`, ou seja, que não vem do arquivo).
+
+### Por que Render e não Vercel
+
+Vercel e afins rodam funções serverless, e este app precisa de três coisas
+que serverless não dá:
+
+| precisa de | por quê |
+|---|---|
+| disco que persiste | o banco é um arquivo SQLite |
+| processo que fica de pé | o garimpo leva ~70s numa tarefa de fundo |
+| memória entre requisições | o limite de 4 req/s do Last.fm é do processo |
+
+Em serverless o banco sumiria a cada requisição, o garimpo seria morto antes
+de terminar, e cada instância teria seu próprio orçamento de requisições —
+estourando o teto do Last.fm.
+
+### O aviso do disco
+
+O bloco `disk` do `render.yaml` é o que faz o SQLite sobreviver a reinício e
+a deploy. **Disco persistente não existe no plano gratuito do Render**: lá o
+sistema de arquivos é apagado a cada deploy, e com ele todas as contas e
+descobertas. Ou plano pago, ou trocar o SQLite por um Postgres externo.
+
 ## Testes
 
 ```bash
