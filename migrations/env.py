@@ -5,6 +5,7 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import event
 
 from app.config import obter_config
 from app.db import criar_engine
@@ -30,9 +31,28 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     engine = criar_engine()
+
+    # DESLIGAR AS CHAVES ESTRANGEIRAS AQUI NÃO É OPCIONAL.
+    #
+    # O SQLite não sabe ALTER TABLE de verdade: pra mudar uma coluna, o
+    # alembic (render_as_batch) recria a tabela — cria uma nova, copia,
+    # **dropa a antiga** e renomeia. Com as FKs ligadas, esse DROP dispara
+    # todo `ON DELETE CASCADE` que aponta pra ela e os filhos somem em
+    # silêncio, sem erro nenhum. Foi o que a 0002 fez com as sementes,
+    # descobertas, feedback, pontes e rodadas.
+    #
+    # Tem que ser por evento de conexão, e não `conexao.execute(...)`: um
+    # execute abre transação implícita e o alembic deixa de gravar a versão.
+    # O ouvinte roda depois do que o `criar_engine` registrou, então vence.
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine, "connect")
+        def _desligar_fk(conexao_dbapi, _):  # noqa: ANN001
+            cursor = conexao_dbapi.cursor()
+            cursor.execute("PRAGMA foreign_keys=OFF")
+            cursor.close()
+
     with engine.connect() as conexao:
-        # render_as_batch: o SQLite não sabe ALTER TABLE de verdade, então o
-        # alembic recria a tabela quando precisa alterar coluna.
         context.configure(
             connection=conexao, target_metadata=target_metadata, render_as_batch=True
         )
