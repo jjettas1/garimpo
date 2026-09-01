@@ -54,14 +54,10 @@ class Config:
 
     ambiente: str
     database_url: str
-    secret_key: str
 
     lastfm_api_key: str
     lastfm_req_por_segundo: float
     cache_artista_dias: int
-
-    resend_api_key: str
-    email_remetente: str
 
     # argon2id. os padrões seguem a RFC 9106; os testes baixam pra não
     # gastar 64 MiB de RAM por hash.
@@ -69,10 +65,6 @@ class Config:
     argon2_memoria_kib: int
     argon2_paralelismo: int
 
-    codigo_validade_minutos: int
-    codigo_max_tentativas: int
-    limite_codigo_por_email_hora: int
-    limite_codigo_por_ip_hora: int
     sessao_validade_dias: int
 
     fanout: int
@@ -101,19 +93,12 @@ def obter_config() -> Config:
     return Config(
         ambiente=ambiente,
         database_url=_texto("DATABASE_URL", f"sqlite:///{RAIZ / 'garimpo.db'}"),
-        secret_key=_texto("SECRET_KEY", obrigatorio=ambiente == "prod") or "dev-inseguro",
         lastfm_api_key=_texto("LASTFM_API_KEY", obrigatorio=True),
         lastfm_req_por_segundo=_decimal("LASTFM_REQ_POR_SEGUNDO", 4.0),
         cache_artista_dias=_inteiro("CACHE_ARTISTA_DIAS", 14),
-        resend_api_key=_texto("RESEND_API_KEY"),
-        email_remetente=_texto("EMAIL_REMETENTE", "garimpo@exemplo.com"),
         argon2_tempo=_inteiro("ARGON2_TEMPO", 3),
         argon2_memoria_kib=_inteiro("ARGON2_MEMORIA_KIB", 65_536),
         argon2_paralelismo=_inteiro("ARGON2_PARALELISMO", 4),
-        codigo_validade_minutos=_inteiro("CODIGO_VALIDADE_MINUTOS", 15),
-        codigo_max_tentativas=_inteiro("CODIGO_MAX_TENTATIVAS", 5),
-        limite_codigo_por_email_hora=_inteiro("LIMITE_CODIGO_POR_EMAIL_HORA", 3),
-        limite_codigo_por_ip_hora=_inteiro("LIMITE_CODIGO_POR_IP_HORA", 10),
         sessao_validade_dias=_inteiro("SESSAO_VALIDADE_DIAS", 30),
         fanout=_inteiro("FANOUT", 30),
         pontes_por_semente=_inteiro("PONTES_POR_SEMENTE", 6),

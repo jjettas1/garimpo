@@ -56,11 +56,6 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------- enums
 
 
-class TipoCodigo(StrEnum):
-    CADASTRO = "cadastro"
-    RECUPERACAO = "recuperacao"
-
-
 class Veredito(StrEnum):
     APROVADO = "aprovado"
     PULADO = "pulado"
@@ -82,7 +77,6 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    email_verificado: Mapped[bool] = mapped_column(default=False, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, nullable=False)
 
     # faixa de ouvintes que o usuário aceita ver. não estava no schema da spec,
@@ -98,21 +92,6 @@ class User(Base):
     )
 
 
-class VerificationCode(Base):
-    __tablename__ = "verification_codes"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    codigo_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    tipo: Mapped[str] = mapped_column(String(20), default=TipoCodigo.CADASTRO, nullable=False)
-    expira_em: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    usado_em: Mapped[datetime | None] = mapped_column(DateTime)
-    tentativas: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, nullable=False)
-
-    __table_args__ = (Index("ix_codes_user_tipo", "user_id", "tipo"),)
-
-
 class Session_(Base):
     """Sessão de login. O nome da classe leva underscore pra não colidir com
     a Session do SQLAlchemy; a tabela continua sendo `sessions`."""
@@ -125,26 +104,6 @@ class Session_(Base):
     expira_em: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(255))
-
-
-class EnvioCodigo(Base):
-    """Registro de cada envio de código, só pra contar o rate limit.
-
-    Não estava na spec como tabela, mas o limite de 3 por email/hora e 10 por
-    IP/hora precisa de histórico em algum lugar — e a spec pede sem Redis.
-    """
-
-    __tablename__ = "envios_codigo"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
-    ip: Mapped[str] = mapped_column(String(64), nullable=False)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, nullable=False)
-
-    __table_args__ = (
-        Index("ix_envios_email_data", "email", "criado_em"),
-        Index("ix_envios_ip_data", "ip", "criado_em"),
-    )
 
 
 # ---------------------------------------------------------------- música

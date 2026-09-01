@@ -22,8 +22,8 @@ from app.db import abrir_sessao
 from app.garimpo import garimpar
 from app.models import Discovery, SeedArtist, User
 
-SENHA_PENDENTE = "!sem-senha-ainda"
-"""Usuário criado pela CLI não tem senha — o hash de verdade vem na etapa 2."""
+SENHA_SEM_LOGIN = "!sem-senha"
+"""Conta sem senha utilizável: serve pra rodar o motor, não pra entrar."""
 
 
 def _achar_usuario(sessao: Session, email: str) -> User:
@@ -34,21 +34,36 @@ def _achar_usuario(sessao: Session, email: str) -> User:
 
 
 def cmd_usuario(args: argparse.Namespace) -> None:
+    """Cria a conta, ou define a senha de uma que já existe.
+
+    Sem `--senha` a conta serve só pra rodar o motor pela linha de comando:
+    o hash guardado não corresponde a senha nenhuma, então ninguém entra
+    com ela pelo site.
+    """
+    from app import auth
+
     with abrir_sessao() as sessao:
-        if sessao.scalar(select(User).where(User.email == args.email)):
-            print(f"usuário {args.email} já existe")
-            return
         config = obter_config()
+        existente = sessao.scalar(select(User).where(User.email == args.email))
+
+        if existente is not None:
+            if not args.senha:
+                print(f"usuário {args.email} já existe (use --senha pra trocar a senha)")
+                return
+            auth.trocar_senha(sessao, existente, args.senha)
+            print(f"senha de {args.email} trocada (as sessões abertas caíram)")
+            return
+
+        hash_senha = auth.gerar_hash_de_senha(args.senha) if args.senha else SENHA_SEM_LOGIN
         sessao.add(
             User(
                 email=args.email,
-                password_hash=SENHA_PENDENTE,
-                email_verificado=True,
+                password_hash=hash_senha,
                 piso_ouvintes=config.piso_ouvintes,
                 teto_ouvintes=config.teto_ouvintes,
             )
         )
-        print(f"usuário {args.email} criado (sem senha — login só na etapa 2)")
+        print(f"usuário {args.email} criado" + ("" if args.senha else " (sem senha de login)"))
 
 
 def cmd_sementes(args: argparse.Namespace) -> None:
@@ -142,8 +157,9 @@ def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="garimpo", description="motor de descoberta, sem tela")
     sub = parser.add_subparsers(dest="comando", required=True)
 
-    p = sub.add_parser("usuario", help="cria um usuário local")
+    p = sub.add_parser("usuario", help="cria um usuário local ou troca a senha dele")
     p.add_argument("--email", required=True)
+    p.add_argument("--senha", help="define a senha; sem ela a conta não entra pelo site")
     p.set_defaults(func=cmd_usuario)
 
     p = sub.add_parser("sementes", help="define ou mostra as sementes")

@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import auth
 from app.config import Config, obter_config
-from app.correio import EmailSender, criar_correio
 from app.db import fabrica_de_sessao
 from app.garimpo import _sem_a_chave, garimpar, registrar_feedback
 from app.lastfm import ClienteLastfm
@@ -33,7 +32,6 @@ from app.models import (
     Run,
     SeedArtist,
     StatusRun,
-    TipoCodigo,
     User,
     Veredito,
 )
@@ -42,7 +40,6 @@ MIN_SEMENTES = 3
 MAX_SEMENTES = 8
 
 COOKIE_SESSAO = "garimpo_sessao"
-COOKIE_CONFIRMANDO = "garimpo_confirmando"
 
 app = FastAPI(
     title="Garimpo",
@@ -88,10 +85,6 @@ def pegar_config() -> Config:
     return obter_config()
 
 
-def pegar_correio(config: Annotated[Config, Depends(pegar_config)]) -> EmailSender:
-    return criar_correio(config)
-
-
 def usuario_atual(
     sessao: Annotated[Session, Depends(pegar_sessao)],
     garimpo_sessao: Annotated[str | None, Cookie(alias=COOKIE_SESSAO)] = None,
@@ -134,7 +127,6 @@ def pegar_fabrica_lastfm(
 
 BD = Annotated[Session, Depends(pegar_sessao)]
 CFG = Annotated[Config, Depends(pegar_config)]
-CORREIO = Annotated[EmailSender, Depends(pegar_correio)]
 LOGADO = Annotated[User | None, Depends(usuario_atual)]
 FABRICA = Annotated[sessionmaker, Depends(pegar_fabrica)]
 LASTFM = Annotated[ClienteLastfm, Depends(pegar_cliente_lastfm)]
@@ -186,95 +178,21 @@ def fazer_cadastro(
     request: Request,
     sessao: BD,
     config: CFG,
-    correio: CORREIO,
     email: Annotated[str, Form()],
     senha: Annotated[str, Form()],
 ):
+    """Cria a conta e já abre a sessão. Não há email pra confirmar."""
     try:
-        auth.cadastrar(sessao, email, senha, correio, ip_do_request(request), config)
-    except (auth.EmailInvalido, auth.SenhaFraca, auth.LimiteExcedido) as erro:
-        return _tela(request, "cadastro.html", erro=str(erro), email=email)
-
-    # o retorno de cadastrar() diz se a conta já existia, mas a resposta é a
-    # mesma nos dois casos — de propósito.
-    resposta = _redirecionar("/confirmar")
-    resposta.set_cookie(
-        COOKIE_CONFIRMANDO,
-        email.strip().lower(),
-        httponly=True,
-        samesite="lax",
-        secure=config.cookie_secure,
-        max_age=3600,
-        path="/",
-    )
-    return resposta
-
-
-@app.get("/confirmar", response_class=HTMLResponse)
-def tela_confirmar(
-    request: Request,
-    garimpo_confirmando: Annotated[str | None, Cookie(alias=COOKIE_CONFIRMANDO)] = None,
-):
-    if not garimpo_confirmando:
-        return _redirecionar("/cadastro")
-    return _tela(request, "confirmar.html", email=garimpo_confirmando)
-
-
-@app.post("/confirmar")
-def fazer_confirmacao(
-    request: Request,
-    sessao: BD,
-    config: CFG,
-    codigo: Annotated[list[str], Form()],
-    garimpo_confirmando: Annotated[str | None, Cookie(alias=COOKIE_CONFIRMANDO)] = None,
-):
-    # a tela manda seis campos de um dígito, todos com name="codigo".
-    # juntar aqui é o que faz o formulário funcionar sem javascript.
-    codigo_inteiro = "".join(pedaco.strip() for pedaco in codigo)
-    if not garimpo_confirmando:
-        return _redirecionar("/cadastro")
-
-    usuario = auth.achar_usuario(sessao, garimpo_confirmando)
-    if usuario is None:
-        # cookie apontando pra conta que não existe: manda recomeçar
-        return _redirecionar("/cadastro")
-
-    try:
-        auth.conferir_codigo(sessao, usuario, codigo_inteiro, TipoCodigo.CADASTRO, config)
+        usuario = auth.cadastrar(sessao, email, senha, config)
     except auth.ErroDeAuth as erro:
-        return _tela(request, "confirmar.html", email=garimpo_confirmando, erro=str(erro))
+        return _tela(request, "cadastro.html", erro=str(erro), email=email)
 
     token = auth.abrir_sessao_de_login(
         sessao, usuario, request.headers.get("user-agent"), config
     )
     resposta = _redirecionar("/sementes")
     _gravar_cookie_de_sessao(resposta, token, config)
-    resposta.delete_cookie(COOKIE_CONFIRMANDO, path="/")
     return resposta
-
-
-@app.post("/confirmar/reenviar")
-def reenviar_codigo(
-    request: Request,
-    sessao: BD,
-    config: CFG,
-    correio: CORREIO,
-    garimpo_confirmando: Annotated[str | None, Cookie(alias=COOKIE_CONFIRMANDO)] = None,
-):
-    if not garimpo_confirmando:
-        return _redirecionar("/cadastro")
-
-    usuario = auth.achar_usuario(sessao, garimpo_confirmando)
-    aviso = "código reenviado. olhe seu email."
-    if usuario is not None and not usuario.email_verificado:
-        try:
-            auth.enviar_codigo(
-                sessao, usuario, correio, ip_do_request(request), TipoCodigo.CADASTRO, config
-            )
-        except auth.LimiteExcedido as erro:
-            aviso = str(erro)
-    # conta inexistente ou já verificada recebe o mesmo aviso, sem enviar nada
-    return _tela(request, "confirmar.html", email=garimpo_confirmando, aviso=aviso)
 
 
 @app.get("/entrar", response_class=HTMLResponse)
@@ -292,18 +210,6 @@ def fazer_login(
 ):
     try:
         usuario = auth.autenticar(sessao, email, senha)
-    except auth.EmailNaoVerificado:
-        resposta = _redirecionar("/confirmar")
-        resposta.set_cookie(
-            COOKIE_CONFIRMANDO,
-            email.strip().lower(),
-            httponly=True,
-            samesite="lax",
-            secure=config.cookie_secure,
-            max_age=3600,
-            path="/",
-        )
-        return resposta
     except auth.ErroDeAuth as erro:
         return _tela(request, "entrar.html", erro=str(erro), email=email)
 

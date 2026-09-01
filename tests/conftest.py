@@ -115,7 +115,6 @@ def usuario(sessao):
     user = User(
         email="teste@exemplo.com",
         password_hash="hash-de-teste",
-        email_verificado=True,
         piso_ouvintes=1_000,
         teto_ouvintes=200_000,
     )
@@ -130,52 +129,20 @@ def usuario(sessao):
 # ------------------------------------------------------------ auth
 
 
-class CorreioFalso:
-    """EmailSender que guarda tudo em vez de mandar."""
-
-    def __init__(self) -> None:
-        self.enviados: list[tuple[str, str, str]] = []
-
-    def enviar(self, destino: str, assunto: str, corpo: str) -> None:
-        self.enviados.append((destino, assunto, corpo))
-
-    @property
-    def ultimo_codigo(self) -> str:
-        """Pesca os 6 dígitos do último email enviado."""
-        import re
-
-        assert self.enviados, "nenhum email foi enviado"
-        achado = re.search(r"\b(\d{6})\b", self.enviados[-1][2])
-        assert achado, f"nenhum código no corpo: {self.enviados[-1][2]!r}"
-        return achado.group(1)
-
-    @property
-    def destinos(self) -> list[str]:
-        return [e[0] for e in self.enviados]
-
-
 @pytest.fixture
-def correio():
-    return CorreioFalso()
-
-
-@pytest.fixture
-def cadastrado(sessao, correio, config):
-    """Um usuário com email já confirmado e senha conhecida."""
+def cadastrado(sessao, config):
+    """Um usuário com senha conhecida, pronto pra entrar."""
     from app import auth
 
-    user = auth.cadastrar(sessao, "jaime@exemplo.com", "senha-boa-123", correio, "10.0.0.1", config)
-    auth.conferir_codigo(sessao, user, correio.ultimo_codigo, config=config)
-    correio.enviados.clear()
-    return user
+    return auth.cadastrar(sessao, "jaime@exemplo.com", "senha-boa-123", config)
 
 
 @pytest.fixture
-def cliente_web(sessao, correio, config, cliente):
-    """TestClient com o banco de teste e o correio falso no lugar dos de verdade."""
+def cliente_web(sessao, config, cliente):
+    """TestClient com o banco e o cliente do Last.fm de teste no lugar dos de verdade."""
     from fastapi.testclient import TestClient
 
-    from app.web import app, pegar_config, pegar_correio, pegar_sessao
+    from app.web import app, pegar_config, pegar_sessao
 
     from sqlalchemy.orm import sessionmaker as _sessionmaker
 
@@ -186,7 +153,6 @@ def cliente_web(sessao, correio, config, cliente):
         sessao.commit()
 
     app.dependency_overrides[pegar_sessao] = _sessao
-    app.dependency_overrides[pegar_correio] = lambda: correio
     app.dependency_overrides[pegar_config] = lambda: config
     app.dependency_overrides[pegar_cliente_lastfm] = lambda: cliente
     app.dependency_overrides[pegar_fabrica_lastfm] = lambda: (lambda: cliente)

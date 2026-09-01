@@ -45,20 +45,17 @@ Pegue a chave em <https://www.last.fm/api/account/create>.
 uvicorn app.web:app --reload
 ```
 
-Em <http://127.0.0.1:8000> o app está inteiro até a etapa 3: criar conta,
-confirmar email, cadastrar sementes com autocomplete, garimpar e dar veredito.
+Em <http://127.0.0.1:8000> o app está inteiro: criar conta, cadastrar
+sementes com autocomplete, garimpar, dar veredito, histórico e retrospectiva.
 
-Em desenvolvimento **o código de verificação aparece no terminal**, não na sua
-caixa de entrada — é o `ConsoleEmailSender`. Pra usar email de verdade,
-preencha `RESEND_API_KEY` e ponha `AMBIENTE=prod`.
+Criar conta já entra — não há email pra confirmar.
 
 ### As telas
 
 | rota | o que faz |
 |---|---|
 | `/` | explica o conceito e mostra uma rota de verdade |
-| `/cadastro`, `/entrar` | email e senha, nada mais |
-| `/confirmar` | seis campos de um dígito (funciona sem javascript) |
+| `/cadastro`, `/entrar` | email e senha, nada mais — cadastrar já entra |
 | `/sementes` | 3 a 8 artistas com autocomplete no last.fm, e a faixa de ouvintes |
 | `/garimpo` | uma descoberta por vez, com a rota inteira e os três vereditos |
 | `/historico` | tudo que foi aprovado, com a rota preservada |
@@ -75,7 +72,7 @@ coisa que se move é o ponto que indica rodada em andamento.
 ## Usando o motor pela linha de comando
 
 ```bash
-python -m app.cli usuario  --email eu@exemplo.com
+python -m app.cli usuario  --email eu@exemplo.com --senha uma-senha-boa
 python -m app.cli sementes --email eu@exemplo.com "Duster" "Slint" "Codeine"
 python -m app.cli faixa    --email eu@exemplo.com --piso 500 --teto 80000
 python -m app.cli garimpar --email eu@exemplo.com --limite 10
@@ -121,7 +118,8 @@ fica em "garimpando…" pra sempre.
 
 ## Sobre a autenticação
 
-Feita na mão, sem biblioteca pronta. Três decisões que valem explicação:
+Feita na mão, sem biblioteca pronta. Não há verificação por email: quem
+cadastra entra na hora.
 
 **Senha com argon2id, token de sessão com sha256.** Parece contradição, mas
 não é. Senha é curta e adivinhável: sem um hash lento, um vazamento do banco
@@ -131,12 +129,13 @@ tornaria impossível *procurar* a sessão pelo hash.
 
 **O login nunca diz qual dos dois campos errou.** "Email não cadastrado" e
 "senha incorreta" são a mesma frase, byte a byte. E quando o email não
-existe, a conta é conferida contra um hash falso — senão a resposta voltaria
+existe, a senha é conferida contra um hash falso — senão a resposta voltaria
 instantânea e o cronômetro entregaria quem tem conta aqui.
 
-**Cadastrar com um email que já existe responde igual a um cadastro novo.**
-Sem isso, o formulário de cadastro desmontaria toda a proteção do login. O
-dono de verdade recebe um email avisando da tentativa.
+**O cadastro, esse revela.** Ele precisa dizer se criou a conta ou não, e
+"criou" significa "esse email não tinha dono". Não dá pra evitar sem
+verificação por email. O login, que é onde alguém tentaria entrar, continua
+sem vazar nada.
 
 ## Testes
 

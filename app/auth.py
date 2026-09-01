@@ -1,8 +1,9 @@
-"""Autenticação: senha, código por email, sessão e rate limit.
+"""Autenticação: senha e sessão.
 
-Feito na mão, sem biblioteca de auth pronta. As decisões que parecem
-estranhas estão comentadas onde acontecem — quase todas existem pra evitar
-que a aplicação conte pra um desconhecido quais emails têm conta aqui.
+Feito na mão, sem biblioteca de auth pronta.
+
+Não há verificação de email: quem cadastra entra na hora. A consequência
+está registrada em `cadastrar()` — vale ler antes de mexer.
 """
 
 from __future__ import annotations
@@ -12,21 +13,13 @@ import secrets
 from datetime import timedelta
 from functools import lru_cache
 
-from argon2 import PasswordHasher
+from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Config, obter_config
-from app.correio import EmailSender, texto_do_codigo
-from app.models import (
-    EnvioCodigo,
-    Session_,
-    TipoCodigo,
-    User,
-    VerificationCode,
-    agora,
-)
+from app.models import Session_, User, agora
 
 MENSAGEM_CREDENCIAL_INVALIDA = "email ou senha incorretos"
 """Uma única mensagem pros dois casos, byte a byte.
@@ -51,7 +44,7 @@ class CredenciaisInvalidas(ErroDeAuth):
         super().__init__(MENSAGEM_CREDENCIAL_INVALIDA)
 
 
-class EmailNaoVerificado(ErroDeAuth):
+class EmailJaCadastrado(ErroDeAuth):
     pass
 
 
@@ -60,22 +53,6 @@ class SenhaFraca(ErroDeAuth):
 
 
 class EmailInvalido(ErroDeAuth):
-    pass
-
-
-class CodigoInvalido(ErroDeAuth):
-    pass
-
-
-class CodigoExpirado(ErroDeAuth):
-    pass
-
-
-class CodigoBloqueado(ErroDeAuth):
-    """Queimou as tentativas. Só pedindo outro código."""
-
-
-class LimiteExcedido(ErroDeAuth):
     pass
 
 
@@ -89,8 +66,6 @@ def hasher(config: Config | None = None) -> PasswordHasher:
     O PasswordHasher do argon2-cffi já usa Type.ID por padrão, mas deixo
     explícito: argon2**i** e argon2**d** não servem aqui.
     """
-    from argon2 import Type
-
     config = config or obter_config()
     return PasswordHasher(
         time_cost=config.argon2_tempo,
@@ -147,199 +122,34 @@ def normalizar_email(email: str) -> str:
     return limpo
 
 
-def achar_usuario(sessao: Session, email: str) -> User | None:
-    try:
-        return sessao.scalar(select(User).where(User.email == normalizar_email(email)))
-    except EmailInvalido:
-        return None
-
-
-# ---------------------------------------------------------------- rate limit
-
-
-def _contar_envios(sessao: Session, coluna, valor: str, desde) -> int:
-    return sessao.scalar(
-        select(func.count(EnvioCodigo.id)).where(coluna == valor, EnvioCodigo.criado_em >= desde)
-    )
-
-
-def checar_limite_de_envio(sessao: Session, email: str, ip: str, config: Config) -> None:
-    """3 por email por hora, 10 por IP por hora. Em tabela, sem Redis.
-
-    O limite por email impede encher a caixa de uma pessoa; o limite por IP
-    impede varrer emails atrás de quem tem conta.
-    """
-    desde = agora() - timedelta(hours=1)
-
-    if _contar_envios(sessao, EnvioCodigo.email, email, desde) >= config.limite_codigo_por_email_hora:
-        raise LimiteExcedido("muitos códigos pedidos pra esse email. tente de novo em uma hora.")
-
-    if _contar_envios(sessao, EnvioCodigo.ip, ip, desde) >= config.limite_codigo_por_ip_hora:
-        raise LimiteExcedido("muitos códigos pedidos daqui. tente de novo em uma hora.")
-
-
-def registrar_envio(sessao: Session, email: str, ip: str) -> None:
-    sessao.add(EnvioCodigo(email=email, ip=ip))
-    sessao.flush()
-
-
-# ---------------------------------------------------------------- código
-
-
-def sortear_codigo() -> str:
-    """Seis dígitos, do gerador criptográfico.
-
-    `secrets`, não `random`: o `random` é previsível se alguém observar
-    saídas suficientes.
-    """
-    return f"{secrets.randbelow(1_000_000):06d}"
-
-
-def enviar_codigo(
-    sessao: Session,
-    user: User,
-    correio: EmailSender,
-    ip: str,
-    tipo: TipoCodigo = TipoCodigo.CADASTRO,
-    config: Config | None = None,
-) -> str:
-    """Sorteia um código, guarda o **hash** dele e manda o email.
-
-    Devolve o código em texto puro só pra quem chamou poder testar; em
-    produção ninguém usa esse retorno.
-    """
-    config = config or obter_config()
-    checar_limite_de_envio(sessao, user.email, ip, config)
-
-    # códigos anteriores morrem: se o usuário pediu reenvio, só o novo vale
-    for antigo in sessao.scalars(
-        select(VerificationCode).where(
-            VerificationCode.user_id == user.id,
-            VerificationCode.tipo == tipo,
-            VerificationCode.usado_em.is_(None),
-        )
-    ):
-        antigo.usado_em = agora()
-
-    codigo = sortear_codigo()
-    sessao.add(
-        VerificationCode(
-            user_id=user.id,
-            codigo_hash=hasher().hash(codigo),
-            tipo=tipo,
-            expira_em=agora() + timedelta(minutes=config.codigo_validade_minutos),
-            tentativas=0,
-        )
-    )
-    registrar_envio(sessao, user.email, ip)
-    sessao.flush()
-
-    assunto, corpo = texto_do_codigo(codigo, config.codigo_validade_minutos)
-    correio.enviar(user.email, assunto, corpo)
-    return codigo
-
-
-def conferir_codigo(
-    sessao: Session,
-    user: User,
-    codigo: str,
-    tipo: TipoCodigo = TipoCodigo.CADASTRO,
-    config: Config | None = None,
-) -> None:
-    """Confere o código. Silêncio quando dá certo, exceção quando não.
-
-    O código é de uso único: acertar duas vezes seguidas não funciona.
-    """
-    config = config or obter_config()
-    registro = sessao.scalar(
-        select(VerificationCode)
-        .where(
-            VerificationCode.user_id == user.id,
-            VerificationCode.tipo == tipo,
-            VerificationCode.usado_em.is_(None),
-        )
-        .order_by(VerificationCode.criado_em.desc())
-    )
-    if registro is None:
-        raise CodigoInvalido("código inválido")
-
-    if agora() > registro.expira_em:
-        raise CodigoExpirado("esse código expirou. peça outro.")
-
-    if registro.tentativas >= config.codigo_max_tentativas:
-        raise CodigoBloqueado("código bloqueado por tentativas demais. peça outro.")
-
-    if not conferir_senha(registro.codigo_hash, codigo):
-        registro.tentativas += 1
-        # na última tentativa errada o código morre junto, pra não sobrar
-        # nem mais um chute
-        if registro.tentativas >= config.codigo_max_tentativas:
-            registro.usado_em = agora()
-            sessao.flush()
-            raise CodigoBloqueado("código bloqueado por tentativas demais. peça outro.")
-        sessao.flush()
-        raise CodigoInvalido("código inválido")
-
-    registro.usado_em = agora()
-    if tipo == TipoCodigo.CADASTRO:
-        user.email_verificado = True
-    sessao.flush()
-
-
 # ---------------------------------------------------------------- cadastro
 
 
-def cadastrar(
-    sessao: Session,
-    email: str,
-    senha: str,
-    correio: EmailSender,
-    ip: str,
-    config: Config | None = None,
-) -> User | None:
-    """Cria a conta e manda o código. Devolve None quando o email já é de
-    alguém verificado.
+def cadastrar(sessao: Session, email: str, senha: str, config: Config | None = None) -> User:
+    """Cria a conta. Quem cadastra já entra — não há email pra confirmar.
 
-    O None é de propósito: quem chamou responde a mesma coisa nos dois casos.
-    Um cadastro que responde "email já em uso" desmonta toda a proteção do
-    login — bastaria tentar cadastrar pra descobrir quem tem conta.
+    **Isto vaza quais emails têm conta.** Não dá pra evitar sem verificação
+    por email: o cadastro tem que dizer se deu certo ou não, e "deu certo"
+    significa "esse email não tinha conta".
+
+    O login continua sem vazar nada (mensagem única, tempo constante), que é
+    a metade que importa — é lá que alguém tentaria entrar.
     """
     config = config or obter_config()
     email = normalizar_email(email)
     hash_senha = gerar_hash_de_senha(senha)  # valida o tamanho antes de tudo
 
-    existente = sessao.scalar(select(User).where(User.email == email))
-
-    if existente is not None and existente.email_verificado:
-        # avisa o dono de verdade, e não cria nada
-        checar_limite_de_envio(sessao, email, ip, config)
-        registrar_envio(sessao, email, ip)
-        correio.enviar(
-            email,
-            "Alguém tentou criar uma conta no Garimpo com o seu email",
-            "Se foi você, é só entrar normalmente — você já tem conta.\n"
-            "Se não foi, pode ignorar: nada mudou na sua conta.",
-        )
-        sessao.flush()
-        return None
-
-    if existente is not None:
-        # cadastro que ficou pela metade: troca a senha e manda outro código.
-        # seguro porque continuar exige o código, que vai pro dono do email.
-        existente.password_hash = hash_senha
-        enviar_codigo(sessao, existente, correio, ip, TipoCodigo.CADASTRO, config)
-        return existente
+    if sessao.scalar(select(User).where(User.email == email)) is not None:
+        raise EmailJaCadastrado("esse email já tem conta. tente entrar.")
 
     user = User(
         email=email,
         password_hash=hash_senha,
-        email_verificado=False,
         piso_ouvintes=config.piso_ouvintes,
         teto_ouvintes=config.teto_ouvintes,
     )
     sessao.add(user)
     sessao.flush()
-    enviar_codigo(sessao, user, correio, ip, TipoCodigo.CADASTRO, config)
     return user
 
 
@@ -360,16 +170,22 @@ def autenticar(sessao: Session, email: str, senha: str) -> User:
     if not conferir_senha(hash_alvo, senha) or user is None:
         raise CredenciaisInvalidas
 
-    # só depois da senha conferir é que dá pra falar de email não verificado.
-    # quem chegou aqui já provou que sabe a senha, então não há o que vazar.
-    if not user.email_verificado:
-        raise EmailNaoVerificado("confirme seu email antes de entrar")
-
     if hasher().check_needs_rehash(user.password_hash):
         user.password_hash = hasher().hash(senha)
         sessao.flush()
 
     return user
+
+
+def trocar_senha(sessao: Session, user: User, nova: str) -> None:
+    """Troca a senha e derruba todas as sessões abertas.
+
+    Derrubar é o ponto: se alguém entrou na conta, trocar a senha tem que
+    expulsar essa pessoa — senão a sessão dela continua valendo.
+    """
+    user.password_hash = gerar_hash_de_senha(nova)
+    fechar_todas_as_sessoes(sessao, user)
+    sessao.flush()
 
 
 # ---------------------------------------------------------------- sessão
@@ -442,7 +258,7 @@ def fechar_sessao_de_login(sessao: Session, token: str | None) -> bool:
 
 
 def fechar_todas_as_sessoes(sessao: Session, user: User) -> int:
-    """Derruba o usuário de todos os aparelhos. Usado depois de troca de senha."""
+    """Derruba o usuário de todos os aparelhos."""
     registros = list(sessao.scalars(select(Session_).where(Session_.user_id == user.id)))
     for registro in registros:
         sessao.delete(registro)

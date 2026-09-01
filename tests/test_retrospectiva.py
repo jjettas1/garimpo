@@ -129,7 +129,7 @@ def test_cada_semana_tem_o_proprio_ranking(sessao, cadastrado, fabricar_descober
 
 
 def test_retrospectiva_nao_mistura_usuarios(sessao, cadastrado, fabricar_descoberta):
-    vizinho = User(email="vizinho@x.com", password_hash="x", email_verificado=True)
+    vizinho = User(email="vizinho@x.com", password_hash="x")
     sessao.add(vizinho)
     sessao.flush()
     alheia = fabricar_descoberta(vizinho.id, "Do Vizinho", 10_000, "Ponte Alheia")

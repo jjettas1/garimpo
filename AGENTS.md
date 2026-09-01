@@ -62,17 +62,25 @@ O HTMX também é self-hosted (`app/static/htmx.min.js`). Nada de CDN.
 
 ## Regras da autenticação
 
+> **Desvio consciente da spec.** O `PROMPT-CLAUDE-CODE.md` pede verificação
+> por código de 6 dígitos no email. Isso foi **removido** a pedido: cadastrar
+> entra direto. A migration `0002` derrubou `verification_codes`,
+> `envios_codigo` e `users.email_verificado`.
+
 - Senha: **argon2id**, nunca sha256 nem bcrypt
 - Token de sessão: 32 bytes aleatórios, guardado em **sha256** — e isso está
   certo. Com 256 bits de entropia não há dicionário a temer, e o sal
   aleatório do argon2 impediria procurar a sessão pelo hash
-- Código de 6 dígitos: guardado com argon2 (espaço de 10⁶ é pequeno demais
-  pra hash rápido), 15 min de validade, morre em 5 tentativas erradas
 - Datas: **UTC naive** no banco e no código. O SQLite descarta o fuso em
   silêncio, então misturar aware e naive estoura em comparação
-- Nada pode revelar se um email tem conta: mensagem de login única byte a
-  byte, hash dummy pra igualar o tempo, e cadastro com email existente
-  responde igual a cadastro novo
+- **O login não pode revelar se um email tem conta**: mensagem única byte a
+  byte, e hash dummy pra igualar o tempo quando a conta não existe
+- **O cadastro revela**, e não tem como não revelar sem verificação por
+  email — ele precisa dizer se criou a conta ou não. Se um dia o código por
+  email voltar, essa proteção volta junto
+- Não há rate limit em lugar nenhum. O custo do argon2 (~100ms) é o que
+  segura força bruta no login; se precisar de mais, uma tabela de tentativas
+  resolve, do mesmo jeito que o limite de envio de código fazia antes
 
 ## Regras do feedback
 

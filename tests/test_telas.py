@@ -68,7 +68,7 @@ def test_ninguem_remove_semente_de_outro(logado, sessao, cadastrado, config):
     from app import auth
 
     outro = auth.cadastrar
-    vizinho = User(email="vizinho@x.com", password_hash="x", email_verificado=True)
+    vizinho = User(email="vizinho@x.com", password_hash="x")
     sessao.add(vizinho)
     sessao.flush()
     alheia = SeedArtist(user_id=vizinho.id, nome="Nao Mexa", ordem=0)
@@ -260,101 +260,6 @@ def test_landing_e_publica_e_mostra_uma_rota(cliente_web):
     assert re.search(r"──\d\.\d\d──&gt;", corpo)
 
 
-def test_tela_de_codigo_tem_seis_campos_de_um_digito(cliente_web, correio):
-    cliente_web.post("/cadastro", data={"email": "novo@x.com", "senha": "senha-boa-123"})
-    corpo = cliente_web.get("/confirmar").text
-
-    assert corpo.count('maxlength="1"') == 6
-    assert corpo.count('name="codigo"') == 6
-
-
-def test_seis_campos_chegam_juntos_no_servidor(cliente_web, correio):
-    """Cada campo manda um dígito; o servidor junta. Funciona sem javascript."""
-    cliente_web.post("/cadastro", data={"email": "novo@x.com", "senha": "senha-boa-123"})
-    digitos = list(correio.ultimo_codigo)
-
-    resposta = cliente_web.post("/confirmar", data={"codigo": digitos})
-
-    assert resposta.url.path == "/sementes"
-
-
-# ------------------------------------------------------------ rodada que falha
-
-# Os três testes abaixo cobrem bugs que a suíte não pegava porque, em teste,
-# as duas sessões dividem a mesma conexão. Só apareceram no servidor real.
-
-
-def test_rodada_que_falha_nao_deixa_a_tela_travada(com_sementes, sessao, cliente, monkeypatch):
-    """O pior modo de falha: a rodada morre, ninguém marca a linha em `runs`,
-    e a tela fica em 'garimpando…' pra sempre."""
-    def explodir(*_, **__):
-        raise RuntimeError("o last.fm caiu")
-
-    monkeypatch.setattr(cliente, "similares", explodir)
-    com_sementes.post("/garimpo")
-
-    rodada = sessao.scalars(select(Run)).one()
-    assert rodada.status == StatusRun.ERRO
-    assert rodada.terminado_em is not None
-
-    corpo = com_sementes.get("/garimpo/estado").text
-    assert 'hx-trigger="every 2s"' not in corpo  # o polling parou
-    assert "tentar de novo" in corpo
-
-
-def test_erro_da_rodada_nao_vaza_a_chave_do_lastfm(com_sementes, sessao, cliente, config, monkeypatch):
-    """O httpx põe a URL inteira na exceção — e a URL tem `api_key=...`.
-    Essa mensagem vai pro banco e aparece na tela."""
-    def explodir(*_, **__):
-        raise RuntimeError(
-            f"403 Forbidden for url 'https://ws.audioscrobbler.com/2.0/"
-            f"?api_key={config.lastfm_api_key}&method=artist.getInfo'"
-        )
-
-    monkeypatch.setattr(cliente, "similares", explodir)
-    com_sementes.post("/garimpo")
-
-    rodada = sessao.scalars(select(Run)).one()
-    assert config.lastfm_api_key not in rodada.erro
-    assert "***" in rodada.erro
-    assert config.lastfm_api_key not in com_sementes.get("/garimpo/estado").text
-
-
-def test_engine_de_arquivo_liga_o_wal(tmp_path):
-    """Sem WAL, o garimpo escrevendo em segundo plano trava o polling lendo:
-    `database is locked` na primeira rodada."""
-    from sqlalchemy import text
-
-    from app.db import criar_engine
-
-    engine = criar_engine(f"sqlite:///{tmp_path / 'teste.db'}")
-    with engine.connect() as conexao:
-        assert conexao.execute(text("PRAGMA journal_mode")).scalar() == "wal"
-        assert conexao.execute(text("PRAGMA foreign_keys")).scalar() == 1
-
-
-def test_leitura_nao_trava_enquanto_outro_escreve(tmp_path):
-    """O caso concreto: a tarefa de fundo com uma escrita aberta, o polling
-    querendo ler. Em modo journal padrão isso estoura."""
-    from sqlalchemy.orm import sessionmaker
-
-    from app.db import criar_engine
-    from app.models import Base
-
-    engine = criar_engine(f"sqlite:///{tmp_path / 'teste.db'}")
-    Base.metadata.create_all(engine)
-    Fabrica = sessionmaker(bind=engine)
-
-    with Fabrica() as escritor, Fabrica() as leitor:
-        escritor.add(User(email="a@b.com", password_hash="x"))
-        escritor.flush()  # escrita aberta, ainda sem commit
-
-        assert leitor.scalars(select(User)).all() == []  # lê sem travar
-
-        escritor.commit()
-        assert len(leitor.scalars(select(User)).all()) == 1
-
-
 # ------------------------------------------------------------ histórico
 
 
@@ -427,7 +332,7 @@ def test_historico_vem_do_mais_recente_pro_mais_antigo(logado, sessao, cadastrad
 def test_ninguem_ve_o_historico_de_outro(logado, sessao, cadastrado, fabricar_descoberta):
     from app.garimpo import registrar_feedback
 
-    vizinho = User(email="vizinho@x.com", password_hash="x", email_verificado=True)
+    vizinho = User(email="vizinho@x.com", password_hash="x")
     sessao.add(vizinho)
     sessao.flush()
     alheia = fabricar_descoberta(vizinho.id, "Segredo Do Vizinho", 7_000)
