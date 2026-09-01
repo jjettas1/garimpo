@@ -214,6 +214,13 @@ def test_migrations_e_modelos_funcionam_no_postgres():
 
     Ele **apaga e recria** o schema, então aponte pra um banco descartável.
     """
+    if not POSTGRES_DE_TESTE.startswith(("postgres://", "postgresql://", "postgresql+")):
+        pytest.fail(
+            f"TEST_DATABASE_URL não parece uma URL de postgres: {POSTGRES_DE_TESTE!r}\n"
+            "Cole a connection string do Neon ou do Supabase, no formato:\n"
+            "  postgresql://usuario:senha@host.neon.tech/banco?sslmode=require"
+        )
+
     from sqlalchemy import inspect, select, text
     from sqlalchemy.orm import sessionmaker
 
